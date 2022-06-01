@@ -124,11 +124,45 @@
         let tmp = clone(pattern)
         tmp[i][j] = color
         if (check(tmp, color)) {
-          return true
+          return [j, i]
         }
       }
     }
-    return false
+    return null
+  }
+
+  function bestChoice(pattern, color) {
+    let point = null
+    if ((point = willWin(pattern, color))) {
+      return {
+        point: point,
+        result: 1,
+      }
+    }
+
+    let result = -1
+
+    outer: for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        if (pattern[i][j] !== 0) {
+          continue
+        }
+        let tmp = clone(pattern)
+        tmp[i][j] = color
+        let opp = bestChoice(tmp, 3 - color)
+        if (-opp.result >= result) {
+          point = [j, i]
+          result = -opp.result
+        }
+        if (result == 1) {
+          break outer
+        }
+      }
+    }
+    return {
+      point: point,
+      result: point ? result : 0,
+    }
   }
   show()
 </script>

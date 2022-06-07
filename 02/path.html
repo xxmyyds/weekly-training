@@ -1,0 +1,212 @@
+<style>
+  .cell {
+    width: 6px;
+    height: 6px;
+    background-color: gray;
+    border-bottom: solid 1px white;
+    border-right: solid 1px white;
+  }
+  #container {
+    display: flex;
+    flex-wrap: wrap;
+    width: 701px;
+  }
+</style>
+
+<div id="container"></div>
+<button onclick="localStorage.map = JSON.stringify(map);">save</button>
+
+<script>
+  class Sorted {
+    constructor(data, cpmpare) {
+      this.data = data
+      this.compare = cpmpare
+    }
+    take() {
+      if (!this.data.length) return
+      let min = this.data[0]
+      let minIndex = 0
+      for (let i = 0; i < this.data.length; i++) {
+        if (this.compare(this.data[i], min) < 0) {
+          min = this.data[i]
+          minIndex = i
+        }
+      }
+
+      // 取出min的方法
+      this.data[minIndex] = this.data[this.data.length - 1]
+      this.data.pop()
+
+      return min
+    }
+
+    insert(v) {
+      this.data.push(v)
+    }
+    get length() {
+      return this.data.length
+    }
+  }
+
+  // 二插堆
+  class BinaryHeap {
+    constructor(data, cpmpare) {
+      this.data = data
+      this.compare = cpmpare
+    }
+    take() {
+      if (!this.data.length) return
+      let min = this.data[0]
+      let i = 0
+      // fix heap
+      // 沿着树杈向下将每个节点的分支小的补上来
+      while (i < this.data.length) {
+        if (i * 2 + 1 >= this.data.length) break
+        if (i * 2 + 2 >= this.data.length) {
+          this.data[i] = this.data[i * 2 + 1]
+          i = i * 2 + 1
+          break
+        }
+
+        if (this.compare(this.data[i * 2 + 1], this.data[i * 2 + 2]) < 0) {
+          this.data[i] = this.data[i * 2 + 1]
+          i = i * 2 + 1
+        } else {
+          this.data[i] = this.data[i * 2 + 2]
+          i = i * 2 + 2
+        }
+      }
+
+      // 把已经填补过最后多余的一个用数组最后一个填补；
+      // 如果已经是最后一个，就是多余的，pop出去；
+      if (i < this.data.length - 1) this.insertAt(i, this.data.pop())
+      else this.data.pop()
+
+      return min
+    }
+
+    // 向某个位置填补一个，填补完按树杈向上排序到最小置顶
+    insertAt(i, v) {
+      this.data[i] = v
+      while (i > 0 && this.compare(v, this.data[Math.floor((i - 1) / 2)]) < 0) {
+        this.data[i] = this.data[Math.floor((i - 1) / 2)]
+        this.data[Math.floor((i - 1) / 2)] = v
+        i = Math.floor((i - 1) / 2)
+      }
+    }
+
+    insert(v) {
+      this.insertAt(this.data.length, v)
+    }
+    get length() {
+      return this.data.length
+    }
+  }
+
+  let map = localStorage.map
+    ? JSON.parse(localStorage.map)
+    : new Array(10000).fill(0)
+  let container = document.getElementById('container')
+  for (let y = 0; y < 100; y++) {
+    for (let x = 0; x < 100; x++) {
+      let cell = document.createElement('div')
+      cell.classList.add('cell')
+
+      if (map[y * 100 + x] === 1) {
+        cell.style.backgroundColor = 'black'
+      }
+
+      cell.addEventListener('mouseover', () => {
+        if (mouse) {
+          if (clear) {
+            cell.style.backgroundColor = ''
+            map[y * 100 + x] = 0
+          } else {
+            cell.style.backgroundColor = 'black'
+            map[y * 100 + x] = 1
+          }
+        }
+      })
+
+      container.appendChild(cell)
+    }
+  }
+
+  let mouse = false
+  let clear = false
+
+  document.addEventListener('mousedown', (e) => {
+    mouse = true
+    clear = e.which === 3
+  })
+  document.addEventListener('mouseup', () => (mouse = false))
+
+  document.addEventListener('contextmenu', (e) => e.preventDefault())
+
+  function sleep(t) {
+    return new Promise((resolve, reject) => {
+      setTimeout(resolve, t)
+    })
+  }
+
+  async function findPath(map, start, end) {
+    map = map.slice()
+
+    // 距离终点地距离
+    function distance([x, y]) {
+      return (x - end[0]) ** 2 + (y - end[1]) ** 2
+    }
+
+    // 启发式搜索
+    let collection = new BinaryHeap(
+      [start],
+      (a, b) => distance(a) - distance(b)
+    )
+
+    async function insert([x, y], pre) {
+      // 障碍
+      if (map[y * 100 + x] !== 0) return
+      // 超出地图
+      if (x < 0 || y < 0 || x >= 100 || y >= 100) return
+
+      map[y * 100 + x] = pre
+      container.children[y * 100 + x].style.backgroundColor = 'lightgreen'
+      await sleep(1)
+      collection.insert([x, y])
+    }
+
+    while (collection.length) {
+      let [x, y] = collection.take()
+
+      if (x === end[0] && y === end[1]) {
+        let path = []
+        while (x !== start[0] || y !== start[1]) {
+          path.push([x, y])
+          container.children[y * 100 + x].style.backgroundColor = 'pink'
+          ;[x, y] = map[y * 100 + x]
+        }
+        return path
+      }
+
+      await insert([x - 1, y], [x, y])
+      await insert([x + 1, y], [x, y])
+      await insert([x, y - 1], [x, y])
+      await insert([x, y + 1], [x, y])
+
+      if (map[y * 100 + x - 1] !== 1 || map[(y - 1) * 100 + x] !== 1) {
+        await insert([x - 1, y - 1], [x, y])
+      }
+      if (map[y * 100 + x + 1] !== 1 || map[(y - 1) * 100 + x] !== 1) {
+        await insert([x + 1, y - 1], [x, y])
+      }
+      if (map[y * 100 + x - 1] !== 1 || map[(y + 1) * 100 + x] !== 1) {
+        await insert([x - 1, y + 1], [x, y])
+      }
+      if (map[y * 100 + x + 1] !== 1 || map[(y + 1) * 100 + x] !== 1) {
+        await insert([x + 1, y + 1], [x, y])
+      }
+    }
+
+    return null
+  }
+</script>
